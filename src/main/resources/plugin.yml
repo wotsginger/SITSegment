@@ -1,0 +1,22 @@
+name: SITSegment
+version: '1.0'
+main: club.sitmc.sitSegment.SITSegment
+api-version: '1.21'
+prefix: SITMCPK
+load: STARTUP
+authors: [ 上应大Minecraft社 ]
+description: SIT Parkour Segment
+website: www.sitmc.club
+commands:
+  sitsegment:
+    description: SIT Parkour Segment command
+    usage: /sitsegment
+    permission: sitsegment.admin
+    aliases: [sitparkour, sitpk]
+  top:
+    description: SIT Parkour leaderboard
+    usage: /top
+permissions:
+  sitsegment.admin:
+    description: SIT Parkour admin commands
+    default: op
