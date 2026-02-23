@@ -71,7 +71,7 @@ public class ParkourListener implements Listener {
         }
 
         EquipmentSlot hand = event.getHand();
-        if (hand == null) {
+        if (hand != EquipmentSlot.HAND) {
             return;
         }
 
@@ -86,16 +86,6 @@ public class ParkourListener implements Listener {
         if (!isReturn && !isRestart) {
             return;
         }
-
-        long currentTick = player.getWorld().getFullTime();
-        if (player.hasMetadata("sitsegment_last_interact_tick")) {
-            long lastTick = player.getMetadata("sitsegment_last_interact_tick").get(0).asLong();
-            if (lastTick == currentTick) {
-                return;
-            }
-        }
-        player.setMetadata("sitsegment_last_interact_tick",
-                new org.bukkit.metadata.FixedMetadataValue(manager.getPlugin(), currentTick));
 
         if (isReturn) {
             event.setCancelled(true);
