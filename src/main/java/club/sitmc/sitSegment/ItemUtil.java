@@ -1,5 +1,6 @@
 package club.sitmc.sitSegment;
 
+import java.util.function.Predicate;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -12,11 +13,13 @@ import org.bukkit.persistence.PersistentDataType;
 public class ItemUtil {
     private final NamespacedKey returnKey;
     private final NamespacedKey restartKey;
+    private final NamespacedKey exitKey;
     private final LegacyComponentSerializer serializer = LegacyComponentSerializer.legacyAmpersand();
 
     public ItemUtil(SITSegment plugin) {
         this.returnKey = new NamespacedKey(plugin, "return_checkpoint");
         this.restartKey = new NamespacedKey(plugin, "restart_run");
+        this.exitKey = new NamespacedKey(plugin, "exit_run");
     }
 
     public NamespacedKey getReturnKey() {
@@ -26,7 +29,7 @@ public class ItemUtil {
     public ItemStack createReturnItem() {
         ItemStack item = new ItemStack(Material.MAGMA_CREAM);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(serializer.deserialize("&6返回上一个记录点"));
+                meta.displayName(serializer.deserialize("&6返回上一个记录点"));
         meta.getPersistentDataContainer().set(returnKey, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
         return item;
@@ -35,8 +38,17 @@ public class ItemUtil {
     public ItemStack createRestartItem() {
         ItemStack item = new ItemStack(Material.NETHER_STAR);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(serializer.deserialize("&e重新开始跑酷"));
+                meta.displayName(serializer.deserialize("&e重新开始跑酷"));
         meta.getPersistentDataContainer().set(restartKey, PersistentDataType.BYTE, (byte) 1);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    public ItemStack createExitItem() {
+        ItemStack item = new ItemStack(Material.LAPIS_LAZULI);
+        ItemMeta meta = item.getItemMeta();
+                meta.displayName(serializer.deserialize("&c退出当前跑酷"));
+        meta.getPersistentDataContainer().set(exitKey, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
         return item;
     }
@@ -63,24 +75,27 @@ public class ItemUtil {
         return meta.getPersistentDataContainer().has(restartKey, PersistentDataType.BYTE);
     }
 
-    public boolean hasReturnItem(Player player) {
-        PlayerInventory inventory = player.getInventory();
-        for (ItemStack item : inventory.getContents()) {
-            if (isReturnItem(item)) {
-                return true;
-            }
+    public boolean isExitItem(ItemStack item) {
+        if (item == null || item.getType() != Material.LAPIS_LAZULI) {
+            return false;
         }
-        return false;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return false;
+        }
+        return meta.getPersistentDataContainer().has(exitKey, PersistentDataType.BYTE);
+    }
+
+    public boolean hasReturnItem(Player player) {
+        return hasItem(player, this::isReturnItem);
     }
 
     public boolean hasRestartItem(Player player) {
-        PlayerInventory inventory = player.getInventory();
-        for (ItemStack item : inventory.getContents()) {
-            if (isRestartItem(item)) {
-                return true;
-            }
-        }
-        return false;
+        return hasItem(player, this::isRestartItem);
+    }
+
+    public boolean hasExitItem(Player player) {
+        return hasItem(player, this::isExitItem);
     }
 
     public void giveReturnItem(Player player) {
@@ -90,25 +105,42 @@ public class ItemUtil {
         player.getInventory().addItem(createReturnItem());
     }
 
-    public void giveRestartItem(Player player) {
-        PlayerInventory inventory = player.getInventory();
-        int hotbarSlot = 8;
-        int restartSlot = findRestartItemSlot(inventory);
-        ItemStack restartItem = restartSlot >= 0 ? inventory.getItem(restartSlot) : createRestartItem();
+    public void giveExitItem(Player player) {
+        removeLegacyExitBarrier(player);
+        ensureItemInHotbar(player.getInventory(), 7, this::isExitItem, createExitItem());
+    }
 
-        if (restartSlot == hotbarSlot) {
+    public void giveRestartItem(Player player) {
+        ensureItemInHotbar(player.getInventory(), 8, this::isRestartItem, createRestartItem());
+    }
+
+    private boolean hasItem(Player player, Predicate<ItemStack> matcher) {
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (matcher.test(item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void ensureItemInHotbar(PlayerInventory inventory, int hotbarSlot,
+                                    Predicate<ItemStack> matcher, ItemStack targetItem) {
+        int itemSlot = findItemSlot(inventory, matcher);
+        ItemStack selected = itemSlot >= 0 ? inventory.getItem(itemSlot) : targetItem;
+
+        if (itemSlot == hotbarSlot) {
             return;
         }
 
         ItemStack slotItem = inventory.getItem(hotbarSlot);
-        if (restartSlot >= 0) {
-            inventory.setItem(hotbarSlot, restartItem);
-            inventory.setItem(restartSlot, slotItem);
+        if (itemSlot >= 0) {
+            inventory.setItem(hotbarSlot, selected);
+            inventory.setItem(itemSlot, slotItem);
             return;
         }
 
         if (isEmpty(slotItem)) {
-            inventory.setItem(hotbarSlot, restartItem);
+            inventory.setItem(hotbarSlot, selected);
             return;
         }
 
@@ -116,14 +148,34 @@ public class ItemUtil {
         if (emptySlot == -1) {
             return;
         }
+
         inventory.setItem(emptySlot, slotItem);
-        inventory.setItem(hotbarSlot, restartItem);
+        inventory.setItem(hotbarSlot, selected);
     }
 
-    private int findRestartItemSlot(PlayerInventory inventory) {
+    private void removeLegacyExitBarrier(Player player) {
+        PlayerInventory inventory = player.getInventory();
         ItemStack[] contents = inventory.getContents();
         for (int i = 0; i < contents.length; i++) {
-            if (isRestartItem(contents[i])) {
+            ItemStack item = contents[i];
+            if (item == null || item.getType() != Material.BARRIER) {
+                continue;
+            }
+            ItemMeta meta = item.getItemMeta();
+            if (meta == null) {
+                continue;
+            }
+            if (!meta.getPersistentDataContainer().has(exitKey, PersistentDataType.BYTE)) {
+                continue;
+            }
+            inventory.setItem(i, null);
+        }
+    }
+
+    private int findItemSlot(PlayerInventory inventory, Predicate<ItemStack> matcher) {
+        ItemStack[] contents = inventory.getContents();
+        for (int i = 0; i < contents.length; i++) {
+            if (matcher.test(contents[i])) {
                 return i;
             }
         }

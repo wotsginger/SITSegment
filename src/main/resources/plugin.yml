@@ -8,15 +8,38 @@ authors: [ 上应大Minecraft社 ]
 description: SIT Parkour Segment
 website: www.sitmc.club
 commands:
-  sitsegment:
+  sitpk:
     description: SIT Parkour Segment command
-    usage: /sitsegment
-    permission: sitsegment.admin
-    aliases: [sitparkour, sitpk]
+    usage: /sitpk
   top:
     description: SIT Parkour leaderboard
     usage: /top
 permissions:
-  sitsegment.admin:
-    description: SIT Parkour admin commands
+  sitsegment.command.exit:
+    description: Allow using /sitpk exit
+    default: true
+  sitsegment.command.world:
+    description: Allow using /sitpk world
     default: op
+  sitsegment.command.set:
+    description: Allow using /sitpk set
+    default: op
+  sitsegment.command.del:
+    description: Allow using /sitpk del
+    default: op
+  sitsegment.command.reload:
+    description: Allow using /sitpk reload
+    default: op
+  sitsegment.command.top:
+    description: Allow using /top
+    default: true
+  sitsegment.admin:
+    description: SIT Parkour admin aggregate permission
+    default: op
+    children:
+      sitsegment.command.exit: true
+      sitsegment.command.world: true
+      sitsegment.command.set: true
+      sitsegment.command.del: true
+      sitsegment.command.reload: true
+      sitsegment.command.top: true

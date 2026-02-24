@@ -66,36 +66,12 @@ public class ParkourListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerInteract(PlayerInteractEvent event) {
         Action action = event.getAction();
-        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) {
+        if (action == Action.RIGHT_CLICK_AIR) {
+            handleRightClick(event);
             return;
         }
-
-        EquipmentSlot hand = event.getHand();
-        if (hand != EquipmentSlot.HAND) {
-            return;
-        }
-
-        Player player = event.getPlayer();
-        ItemStack item = event.getItem();
-        if (item == null || item.getType() == Material.AIR) {
-            return;
-        }
-
-        boolean isReturn = manager.getItemUtil().isReturnItem(item);
-        boolean isRestart = manager.getItemUtil().isRestartItem(item);
-        if (!isReturn && !isRestart) {
-            return;
-        }
-
-        if (isReturn) {
-            event.setCancelled(true);
-            manager.handleReturnItem(player);
-            return;
-        }
-
-        if (isRestart) {
-            event.setCancelled(true);
-            manager.handleRestartItem(player);
+        if (action == Action.RIGHT_CLICK_BLOCK) {
+            handleRightClick(event);
         }
     }
 
@@ -126,5 +102,42 @@ public class ParkourListener implements Listener {
         return from.getBlockX() == to.getBlockX()
                 && from.getBlockY() == to.getBlockY()
                 && from.getBlockZ() == to.getBlockZ();
+    }
+
+    private void handleRightClick(PlayerInteractEvent event) {
+        EquipmentSlot hand = event.getHand();
+        if (hand != EquipmentSlot.HAND) {
+            return;
+        }
+
+        Player player = event.getPlayer();
+        ItemStack item = event.getItem();
+        if (item == null || item.getType() == Material.AIR) {
+            return;
+        }
+
+        boolean isReturn = manager.getItemUtil().isReturnItem(item);
+        boolean isRestart = manager.getItemUtil().isRestartItem(item);
+        boolean isExit = manager.getItemUtil().isExitItem(item);
+        if (!isReturn && !isRestart && !isExit) {
+            return;
+        }
+
+        if (isReturn) {
+            event.setCancelled(true);
+            manager.handleReturnItem(player);
+            return;
+        }
+
+        if (isRestart) {
+            event.setCancelled(true);
+            manager.handleRestartItem(player);
+            return;
+        }
+
+        if (isExit) {
+            event.setCancelled(true);
+            manager.handleExitParkour(player);
+        }
     }
 }

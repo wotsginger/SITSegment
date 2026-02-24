@@ -56,11 +56,11 @@ public class ParkourManager {
         if (pointsSection != null) {
             for (String worldName : pointsSection.getKeys(false)) {
                 WorldData data = new WorldData();
-                Location start = config.getLocation("points." + worldName + ".start");
+                Location start = readLocation(config, "points." + worldName + ".start");
                 if (start != null) {
                     data.setStart(start);
                 }
-                Location end = config.getLocation("points." + worldName + ".end");
+                Location end = readLocation(config, "points." + worldName + ".end");
                 if (end != null) {
                     data.setEnd(end);
                 }
@@ -73,7 +73,7 @@ public class ParkourManager {
                         } catch (NumberFormatException ex) {
                             continue;
                         }
-                        Location checkpoint = config.getLocation("points." + worldName + ".checkpoints." + key);
+                        Location checkpoint = readLocation(config, "points." + worldName + ".checkpoints." + key);
                         if (checkpoint != null) {
                             data.setCheckpoint(index, checkpoint);
                         }
@@ -133,7 +133,7 @@ public class ParkourManager {
                         continue;
                     }
                     int lastIndex = worldSection.getInt(key + ".lastIndex", 0);
-                    Location lastLocation = config.getLocation("sessions." + worldName + "." + key + ".lastLocation");
+                    Location lastLocation = readLocation(config, "sessions." + worldName + "." + key + ".lastLocation");
                     if (lastLocation == null) {
                         continue;
                     }
@@ -343,6 +343,7 @@ public class ParkourManager {
             return;
         }
         itemUtil.giveReturnItem(player);
+        itemUtil.giveExitItem(player);
         itemUtil.giveRestartItem(player);
     }
 
@@ -398,8 +399,7 @@ public class ParkourManager {
         long startTimeMs = System.currentTimeMillis() - savedSession.getElapsedMs();
         session.restore(world.getName(), startTimeMs, savedSession.getLastCheckpointIndex(), lastLocation, data);
         sessions.put(playerId, session);
-        player.teleport(lastLocation.clone());
-        messages.send(player, "已恢复跑酷进度。");
+        messages.send(player, "&a已恢复你的跑酷进度。");
         giveDefaultItems(player);
     }
 
@@ -418,7 +418,7 @@ public class ParkourManager {
         RunSession session = new RunSession(player.getUniqueId());
         session.start(player.getWorld().getName(), data.getStart(), data);
         sessions.put(player.getUniqueId(), session);
-        messages.send(player, "计时开始。");
+        messages.send(player, "&a计时开始。");
         giveDefaultItems(player);
     }
 
@@ -428,19 +428,19 @@ public class ParkourManager {
         }
         Location checkpoint = data.getCheckpoint(index);
         session.reachCheckpoint(index, checkpoint, data);
-        messages.send(player, "已到达记录点 " + index + "。");
+        messages.send(player, "&a已到达记录点 &f" + index);
         giveDefaultItems(player);
     }
 
     public void tryFinish(Player player, RunSession session) {
         if (session.getNextCheckpointIndex() != null) {
-            messages.send(player, "还没有经过所有记录点。");
+            messages.send(player, "&c你还没有经过所有记录点。");
             return;
         }
         long elapsed = System.currentTimeMillis() - session.getStartTimeMs();
         boolean newRecord = updateRecord(player, elapsed);
-        String suffix = newRecord ? "（新纪录）" : "";
-        messages.send(player, "完成！用时: " + formatDuration(elapsed) + suffix);
+        String suffix = newRecord ? " &e(新纪录)" : "";
+        messages.send(player, "&a完成！用时: &f" + formatDuration(elapsed) + suffix);
         messages.clearActionBar(player);
         sessions.remove(player.getUniqueId());
         clearSavedSession(player.getUniqueId(), player.getWorld().getName());
@@ -449,10 +449,10 @@ public class ParkourManager {
     public void handleReturnItem(Player player) {
         RunSession session = sessions.get(player.getUniqueId());
         if (session == null || !session.isStarted()) {
-            messages.send(player, "当前没有进行中的跑酷。");
+            messages.send(player, "&c当前没有进行中的跑酷。");
             return;
         }
-        teleportToCheckpoint(player, session, "已返回上一个记录点。");
+        teleportToCheckpoint(player, session, "&a已返回上一个记录点。");
     }
 
     public void handleRestartItem(Player player) {
@@ -462,12 +462,12 @@ public class ParkourManager {
         World world = player.getWorld();
         WorldMode mode = getWorldMode(world);
         if (mode == WorldMode.NONE) {
-            messages.send(player, "当前世界未启用跑酷模式。");
+            messages.send(player, "&c当前世界未启用跑酷模式。");
             return;
         }
         WorldData data = worldDataMap.get(world.getName());
         if (data == null || data.getStart() == null) {
-            messages.send(player, "当前世界未设置起点。");
+            messages.send(player, "&c当前世界未设置起点。");
             return;
         }
         sessions.remove(player.getUniqueId());
@@ -477,7 +477,19 @@ public class ParkourManager {
         RunSession session = new RunSession(player.getUniqueId());
         session.start(world.getName(), start, data);
         sessions.put(player.getUniqueId(), session);
-        messages.send(player, "已重新开始跑酷。");
+        messages.send(player, "&a已重新开始跑酷。");
+        giveDefaultItems(player);
+    }
+    public void handleExitParkour(Player player) {
+        if (player == null) {
+            return;
+        }
+        World world = player.getWorld();
+        sessions.remove(player.getUniqueId());
+        clearSavedSession(player.getUniqueId(), world.getName());
+        messages.clearActionBar(player);
+        player.teleport(world.getSpawnLocation());
+        messages.send(player, "&a已退出当前跑酷。");
         giveDefaultItems(player);
     }
 
@@ -597,7 +609,7 @@ public class ParkourManager {
                         if (lastCheckpoint != null && WorldData.isSameBlock(player.getLocation(), lastCheckpoint)) {
                             continue;
                         }
-                        teleportToCheckpoint(player, session, "疾跑中断，已返回上一个记录点。");
+                        teleportToCheckpoint(player, session, "&c疾跑中断，已返回上一个记录点。");
                     }
                 }
             }
@@ -607,7 +619,7 @@ public class ParkourManager {
     private void teleportToCheckpoint(Player player, RunSession session, String message) {
         Location target = session.getLastCheckpointLocation();
         if (target == null) {
-            messages.send(player, "未找到可返回的记录点。");
+            messages.send(player, "&c未找到可返回的记录点。");
             return;
         }
         player.teleport(target.clone());
@@ -676,6 +688,31 @@ public class ParkourManager {
         block.setYaw(location.getYaw());
         block.setPitch(location.getPitch());
         return block;
+    }
+
+    private Location readLocation(FileConfiguration config, String path) {
+        Location direct = config.getLocation(path);
+        if (direct != null) {
+            return direct;
+        }
+
+        ConfigurationSection section = config.getConfigurationSection(path);
+        if (section == null) {
+            return null;
+        }
+
+        if (!section.isSet("x") || !section.isSet("y") || !section.isSet("z")) {
+            return null;
+        }
+
+        String worldName = section.getString("world");
+        World world = worldName == null || worldName.isEmpty() ? null : Bukkit.getWorld(worldName);
+        double x = section.getDouble("x");
+        double y = section.getDouble("y");
+        double z = section.getDouble("z");
+        float yaw = (float) section.getDouble("yaw", 0.0D);
+        float pitch = (float) section.getDouble("pitch", 0.0D);
+        return new Location(world, x, y, z, yaw, pitch);
     }
 
     public String formatDuration(long millis) {

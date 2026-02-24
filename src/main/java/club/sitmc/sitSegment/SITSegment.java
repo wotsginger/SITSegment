@@ -17,7 +17,7 @@ public final class SITSegment extends JavaPlugin {
         getServer().getPluginManager().registerEvents(listener, this);
 
         ParkourCommand command = new ParkourCommand(parkourManager);
-        PluginCommand pluginCommand = getCommand("sitsegment");
+        PluginCommand pluginCommand = getCommand("sitpk");
         if (pluginCommand != null) {
             pluginCommand.setExecutor(command);
             pluginCommand.setTabCompleter(command);
