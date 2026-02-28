@@ -23,6 +23,7 @@ public class ParkourManager {
     private final SITSegment plugin;
     private final MessageUtil messages;
     private final ItemUtil itemUtil;
+    private final PracticeSpecManager practiceSpecManager;
     private final HologramManager hologramManager;
     private final Map<String, WorldData> worldDataMap = new HashMap<>();
     private final Map<String, Map<UUID, RecordEntry>> records = new HashMap<>();
@@ -37,6 +38,7 @@ public class ParkourManager {
         String prefix = plugin.getConfig().getString("prefix", "&3&lSIT-Parkour &8| &f");
         this.messages = new MessageUtil(prefix);
         this.itemUtil = new ItemUtil(plugin);
+        this.practiceSpecManager = new PracticeSpecManager(plugin, messages, itemUtil, this);
         this.hologramManager = new HologramManager();
     }
 
@@ -47,6 +49,7 @@ public class ParkourManager {
         segmentWorlds.clear();
         onlySprintWorlds.clear();
         hologramManager.clearStoredHolograms();
+        practiceSpecManager.loadConfig();
 
         FileConfiguration config = plugin.getConfig();
         segmentWorlds.addAll(config.getStringList("worlds.segment"));
@@ -264,6 +267,10 @@ public class ParkourManager {
 
     public ItemUtil getItemUtil() {
         return itemUtil;
+    }
+
+    public PracticeSpecManager getPracticeSpecManager() {
+        return practiceSpecManager;
     }
 
     public WorldData getWorldData(World world) {

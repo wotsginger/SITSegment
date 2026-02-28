@@ -14,6 +14,24 @@ commands:
   top:
     description: SIT Parkour leaderboard
     usage: /top
+  prac:
+    description: Enter practice mode
+    usage: /prac
+  unprac:
+    description: Exit practice mode
+    usage: /unprac
+  pracworld:
+    description: Toggle practice mode for current world
+    usage: /pracworld
+  spec:
+    description: Enter spectator mode
+    usage: /spec
+  unspec:
+    description: Exit spectator mode
+    usage: /unspec
+  specworld:
+    description: Toggle spectator mode for current world
+    usage: /specworld
 permissions:
   sitsegment.command.exit:
     description: Allow using /sitpk exit
@@ -33,6 +51,24 @@ permissions:
   sitsegment.command.top:
     description: Allow using /top
     default: true
+  sitsegment.command.prac:
+    description: Allow using /prac
+    default: true
+  sitsegment.command.unprac:
+    description: Allow using /unprac
+    default: true
+  sitsegment.command.pracworld:
+    description: Allow using /pracworld
+    default: op
+  sitsegment.command.spec:
+    description: Allow using /spec
+    default: true
+  sitsegment.command.unspec:
+    description: Allow using /unspec
+    default: true
+  sitsegment.command.specworld:
+    description: Allow using /specworld
+    default: op
   sitsegment.admin:
     description: SIT Parkour admin aggregate permission
     default: op
@@ -43,3 +79,9 @@ permissions:
       sitsegment.command.del: true
       sitsegment.command.reload: true
       sitsegment.command.top: true
+      sitsegment.command.prac: true
+      sitsegment.command.unprac: true
+      sitsegment.command.pracworld: true
+      sitsegment.command.spec: true
+      sitsegment.command.unspec: true
+      sitsegment.command.specworld: true

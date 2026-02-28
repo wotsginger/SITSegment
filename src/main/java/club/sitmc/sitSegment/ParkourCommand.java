@@ -27,6 +27,10 @@ public class ParkourCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (manager.getPracticeSpecManager().onNamedCommand(command.getName(), sender)) {
+            return true;
+        }
+
         if (args.length == 0) {
             sendUsage(sender);
             return true;
@@ -70,6 +74,24 @@ public class ParkourCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 handleReload(sender);
+                return true;
+            case "prac":
+                manager.getPracticeSpecManager().handlePrac(sender);
+                return true;
+            case "unprac":
+                manager.getPracticeSpecManager().handleUnprac(sender);
+                return true;
+            case "pracworld":
+                manager.getPracticeSpecManager().handlePracWorld(sender);
+                return true;
+            case "spec":
+                manager.getPracticeSpecManager().handleSpec(sender);
+                return true;
+            case "unspec":
+                manager.getPracticeSpecManager().handleUnspec(sender);
+                return true;
+            case "specworld":
+                manager.getPracticeSpecManager().handleSpecWorld(sender);
                 return true;
             default:
                 sendUsage(sender);
@@ -205,6 +227,24 @@ public class ParkourCommand implements CommandExecutor, TabCompleter {
         if (sender.hasPermission(PERM_RELOAD)) {
             messages.send(sender, "&f用法: /sitpk reload");
         }
+        if (sender.hasPermission("sitsegment.command.prac")) {
+            messages.send(sender, "&f用法: /sitpk prac 或 /prac");
+        }
+        if (sender.hasPermission("sitsegment.command.unprac")) {
+            messages.send(sender, "&f用法: /sitpk unprac 或 /unprac");
+        }
+        if (sender.hasPermission("sitsegment.command.pracworld")) {
+            messages.send(sender, "&f用法: /sitpk pracworld 或 /pracworld");
+        }
+        if (sender.hasPermission("sitsegment.command.spec")) {
+            messages.send(sender, "&f用法: /sitpk spec 或 /spec");
+        }
+        if (sender.hasPermission("sitsegment.command.unspec")) {
+            messages.send(sender, "&f用法: /sitpk unspec 或 /unspec");
+        }
+        if (sender.hasPermission("sitsegment.command.specworld")) {
+            messages.send(sender, "&f用法: /sitpk specworld 或 /specworld");
+        }
     }
 
     private WorldMode parseMode(String input) {
@@ -237,6 +277,11 @@ public class ParkourCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        String commandName = command.getName().toLowerCase();
+        if (!"sitpk".equals(commandName)) {
+            return Collections.emptyList();
+        }
+
         if (args.length == 1) {
             List<String> subs = new ArrayList<>();
             if (sender.hasPermission(PERM_EXIT)) {
@@ -253,6 +298,24 @@ public class ParkourCommand implements CommandExecutor, TabCompleter {
             }
             if (sender.hasPermission(PERM_RELOAD)) {
                 subs.add("reload");
+            }
+            if (sender.hasPermission("sitsegment.command.prac")) {
+                subs.add("prac");
+            }
+            if (sender.hasPermission("sitsegment.command.unprac")) {
+                subs.add("unprac");
+            }
+            if (sender.hasPermission("sitsegment.command.pracworld")) {
+                subs.add("pracworld");
+            }
+            if (sender.hasPermission("sitsegment.command.spec")) {
+                subs.add("spec");
+            }
+            if (sender.hasPermission("sitsegment.command.unspec")) {
+                subs.add("unspec");
+            }
+            if (sender.hasPermission("sitsegment.command.specworld")) {
+                subs.add("specworld");
             }
             return filterPrefix(args[0], subs);
         }
@@ -279,8 +342,9 @@ public class ParkourCommand implements CommandExecutor, TabCompleter {
             return options;
         }
         List<String> results = new ArrayList<>();
+        String lower = input.toLowerCase();
         for (String option : options) {
-            if (option.startsWith(input.toLowerCase())) {
+            if (option.startsWith(lower)) {
                 results.add(option);
             }
         }

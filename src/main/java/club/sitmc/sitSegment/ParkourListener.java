@@ -7,7 +7,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -15,7 +17,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.event.block.Action;
 
 public class ParkourListener implements Listener {
     private final ParkourManager manager;
@@ -40,6 +41,9 @@ public class ParkourListener implements Listener {
             return;
         }
         Player player = event.getPlayer();
+        if (manager.getPracticeSpecManager().isPracticing(player)) {
+            return;
+        }
         Location start = data.getStart();
         if (start != null && WorldData.isSameBlock(to, start)) {
             manager.startRun(player, data);
@@ -76,8 +80,14 @@ public class ParkourListener implements Listener {
     }
 
     @EventHandler
+    public void onCommandPreprocess(PlayerCommandPreprocessEvent event) {
+        manager.getPracticeSpecManager().onCommandPreprocess(event);
+    }
+
+    @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         manager.saveAndRemoveSession(event.getPlayer());
+        manager.getPracticeSpecManager().onQuit(event.getPlayer());
     }
 
     @EventHandler
@@ -91,6 +101,7 @@ public class ParkourListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         manager.tryRestoreSession(event.getPlayer());
         manager.giveDefaultItems(event.getPlayer());
+        manager.getPracticeSpecManager().onJoin(event.getPlayer());
     }
 
     @EventHandler
@@ -113,6 +124,11 @@ public class ParkourListener implements Listener {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
         if (item == null || item.getType() == Material.AIR) {
+            return;
+        }
+
+        if (manager.getPracticeSpecManager().handlePracticeItemInteract(player, item)) {
+            event.setCancelled(true);
             return;
         }
 

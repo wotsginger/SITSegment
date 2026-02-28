@@ -22,6 +22,12 @@ public final class SITSegment extends JavaPlugin {
             pluginCommand.setExecutor(command);
             pluginCommand.setTabCompleter(command);
         }
+        registerStandaloneCommand("prac", command);
+        registerStandaloneCommand("unprac", command);
+        registerStandaloneCommand("pracworld", command);
+        registerStandaloneCommand("spec", command);
+        registerStandaloneCommand("unspec", command);
+        registerStandaloneCommand("specworld", command);
         PluginCommand topCommand = getCommand("top");
         if (topCommand != null) {
             topCommand.setExecutor(new TopCommand(parkourManager));
@@ -42,5 +48,14 @@ public final class SITSegment extends JavaPlugin {
         reloadConfig();
         parkourManager.load();
         parkourManager.restoreOnlinePlayers();
+    }
+
+    private void registerStandaloneCommand(String name, ParkourCommand executor) {
+        PluginCommand command = getCommand(name);
+        if (command == null) {
+            return;
+        }
+        command.setExecutor(executor);
+        command.setTabCompleter(executor);
     }
 }

@@ -6,3 +6,5 @@ points: {}
 holograms: {}
 records: {}
 sessions: {}
+disabled-worlds: []
+spec-disabled-worlds: []
