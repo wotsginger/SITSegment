@@ -14,6 +14,8 @@ public class ItemUtil {
     private final NamespacedKey returnKey;
     private final NamespacedKey restartKey;
     private final NamespacedKey exitKey;
+    private final NamespacedKey pkwGateReturnKey;
+    private final NamespacedKey pkwAbandonKey;
     private final NamespacedKey practiceReturnKey;
     private final NamespacedKey practiceExitKey;
     private final NamespacedKey practiceFlightKey;
@@ -23,6 +25,8 @@ public class ItemUtil {
         this.returnKey = new NamespacedKey(plugin, "return_checkpoint");
         this.restartKey = new NamespacedKey(plugin, "restart_run");
         this.exitKey = new NamespacedKey(plugin, "exit_run");
+        this.pkwGateReturnKey = new NamespacedKey(plugin, "pkw_gate_return");
+        this.pkwAbandonKey = new NamespacedKey(plugin, "pkw_abandon");
         this.practiceReturnKey = new NamespacedKey(plugin, "practice_return");
         this.practiceExitKey = new NamespacedKey(plugin, "practice_exit");
         this.practiceFlightKey = new NamespacedKey(plugin, "practice_flight");
@@ -86,6 +90,24 @@ public class ItemUtil {
         return item;
     }
 
+    public ItemStack createPkwGateReturnItem() {
+        ItemStack item = new ItemStack(Material.RECOVERY_COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(serializer.deserialize("&d返回所在关口"));
+        meta.getPersistentDataContainer().set(pkwGateReturnKey, PersistentDataType.BYTE, (byte) 1);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    public ItemStack createPkwAbandonItem() {
+        ItemStack item = new ItemStack(Material.BARRIER);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(serializer.deserialize("&c放弃当前跑酷"));
+        meta.getPersistentDataContainer().set(pkwAbandonKey, PersistentDataType.BYTE, (byte) 1);
+        item.setItemMeta(meta);
+        return item;
+    }
+
     public boolean isReturnItem(ItemStack item) {
         if (item == null || item.getType() != Material.MAGMA_CREAM) {
             return false;
@@ -117,6 +139,28 @@ public class ItemUtil {
             return false;
         }
         return meta.getPersistentDataContainer().has(exitKey, PersistentDataType.BYTE);
+    }
+
+    public boolean isPkwGateReturnItem(ItemStack item) {
+        if (item == null || item.getType() != Material.RECOVERY_COMPASS) {
+            return false;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return false;
+        }
+        return meta.getPersistentDataContainer().has(pkwGateReturnKey, PersistentDataType.BYTE);
+    }
+
+    public boolean isPkwAbandonItem(ItemStack item) {
+        if (item == null || item.getType() != Material.BARRIER) {
+            return false;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return false;
+        }
+        return meta.getPersistentDataContainer().has(pkwAbandonKey, PersistentDataType.BYTE);
     }
 
     public boolean isPracticeReturnItem(ItemStack item) {
@@ -164,6 +208,14 @@ public class ItemUtil {
         return hasItem(player, this::isExitItem);
     }
 
+    public boolean hasPkwGateReturnItem(Player player) {
+        return hasItem(player, this::isPkwGateReturnItem);
+    }
+
+    public boolean hasPkwAbandonItem(Player player) {
+        return hasItem(player, this::isPkwAbandonItem);
+    }
+
     public boolean hasPracticeReturnItem(Player player) {
         return hasItem(player, this::isPracticeReturnItem);
     }
@@ -181,6 +233,27 @@ public class ItemUtil {
             return;
         }
         player.getInventory().addItem(createReturnItem());
+    }
+
+    public void givePkwGateReturnItem(Player player) {
+        if (hasPkwGateReturnItem(player)) {
+            return;
+        }
+        player.getInventory().addItem(createPkwGateReturnItem());
+    }
+
+    public void givePkwAbandonItem(Player player) {
+        if (hasPkwAbandonItem(player)) {
+            return;
+        }
+        // Hotbar slot 9 (0-based index 8)
+        ensureItemInHotbar(player.getInventory(), 8, this::isPkwAbandonItem, createPkwAbandonItem());
+    }
+
+    public void removeSegmentItems(Player player) {
+        removeItem(player, this::isReturnItem);
+        removeItem(player, this::isRestartItem);
+        removeItem(player, this::isExitItem);
     }
 
     public void giveExitItem(Player player) {

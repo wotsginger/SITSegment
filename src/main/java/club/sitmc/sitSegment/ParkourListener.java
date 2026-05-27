@@ -29,11 +29,19 @@ public class ParkourListener implements Listener {
     public void onPlayerMove(PlayerMoveEvent event) {
         Location to = event.getTo();
         Location from = event.getFrom();
-        if (to == null || isSameBlock(from, to)) {
+        if (to == null) {
             return;
         }
         World world = to.getWorld();
-        if (manager.getWorldMode(world) == WorldMode.NONE) {
+        WorldMode mode = manager.getWorldMode(world);
+        if (mode == WorldMode.NONE) {
+            return;
+        }
+        if (mode == WorldMode.PKW) {
+            manager.handlePkwMove(event.getPlayer(), from, to);
+            return;
+        }
+        if (isSameBlock(from, to)) {
             return;
         }
         WorldData data = manager.getWorldData(world);
@@ -87,12 +95,14 @@ public class ParkourListener implements Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         manager.saveAndRemoveSession(event.getPlayer());
+        manager.clearPkwSession(event.getPlayer());
         manager.getPracticeSpecManager().onQuit(event.getPlayer());
     }
 
     @EventHandler
     public void onWorldChange(PlayerChangedWorldEvent event) {
         manager.saveAndRemoveSession(event.getPlayer());
+        manager.clearPkwSession(event.getPlayer());
         manager.tryRestoreSession(event.getPlayer());
         manager.giveDefaultItems(event.getPlayer());
     }
@@ -129,6 +139,17 @@ public class ParkourListener implements Listener {
 
         if (manager.getPracticeSpecManager().handlePracticeItemInteract(player, item)) {
             event.setCancelled(true);
+            return;
+        }
+
+        if (manager.getItemUtil().isPkwGateReturnItem(item)) {
+            event.setCancelled(true);
+            manager.handlePkwReturn(player);
+            return;
+        }
+        if (manager.getItemUtil().isPkwAbandonItem(item)) {
+            event.setCancelled(true);
+            manager.handlePkwAbandon(player);
             return;
         }
 

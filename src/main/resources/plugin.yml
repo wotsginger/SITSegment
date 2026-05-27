@@ -3,7 +3,7 @@ version: '1.0'
 main: club.sitmc.sitSegment.SITSegment
 api-version: '1.21'
 prefix: SITMCPK
-load: STARTUP
+load: POSTWORLD
 authors: [ 上应大Minecraft社 ]
 description: SIT Parkour Segment
 website: www.sitmc.club
