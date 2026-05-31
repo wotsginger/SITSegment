@@ -38,6 +38,7 @@ public class PracticeSpecManager {
     private final NamespacedKey practicePrevFlyingKey;
     private final NamespacedKey spectatorLocationKey;
     private final NamespacedKey spectatorGameModeKey;
+    private final NamespacedKey specialModeKey;
 
     public PracticeSpecManager(SITSegment plugin, MessageUtil messages, ItemUtil itemUtil, ParkourManager parkourManager) {
         this.plugin = plugin;
@@ -50,6 +51,7 @@ public class PracticeSpecManager {
         this.practicePrevFlyingKey = new NamespacedKey(plugin, "practice_prev_flying");
         this.spectatorLocationKey = new NamespacedKey(plugin, "spec_location");
         this.spectatorGameModeKey = new NamespacedKey(plugin, "spec_gamemode");
+        this.specialModeKey = new NamespacedKey(plugin, "special_mode");
     }
 
     public void loadConfig() {
@@ -108,6 +110,7 @@ public class PracticeSpecManager {
         if (isPracticing(player)) {
             itemUtil.givePracticeItems(player);
             applyPracticeFlightState(player);
+            setSpecialModeMarker(player);
             messages.send(sender, "&e你已经在练习模式。");
             return;
         }
@@ -116,6 +119,7 @@ public class PracticeSpecManager {
         saveOriginalFlightState(player);
         setPracticeFlightEnabled(player, false);
         applyPracticeFlightState(player);
+        setSpecialModeMarker(player);
 
         itemUtil.givePracticeItems(player);
         messages.send(sender, "&a已进入练习模式。");
@@ -184,12 +188,14 @@ public class PracticeSpecManager {
             return;
         }
         if (isSpectating(player)) {
+            setSpecialModeMarker(player);
             messages.send(sender, "&e你已经在旁观模式。");
             return;
         }
 
         saveSpectatorState(player, player.getLocation().clone(), player.getGameMode());
         player.setGameMode(GameMode.SPECTATOR);
+        setSpecialModeMarker(player);
         messages.send(sender, "&a已进入旁观模式。");
     }
 
@@ -216,6 +222,7 @@ public class PracticeSpecManager {
             player.setGameMode(state.previousGameMode);
         }
         clearSpectatorState(player);
+        removeSpecialModeMarker(player);
         messages.send(sender, "&a已退出旁观模式。");
     }
 
@@ -250,14 +257,23 @@ public class PracticeSpecManager {
             applyPracticeFlightState(player);
         }
         getSpectatorState(player);
+        if (isPracticing(player) || isSpectating(player)) {
+            setSpecialModeMarker(player);
+        }
     }
 
     public void onQuit(Player player) {
         if (player == null) {
             return;
         }
-        practiceLocations.remove(player.getUniqueId());
-        spectatorStates.remove(player.getUniqueId());
+        UUID uuid = player.getUniqueId();
+        boolean wasInSpecialMode = practiceLocations.containsKey(uuid)
+                || spectatorStates.containsKey(uuid);
+        practiceLocations.remove(uuid);
+        spectatorStates.remove(uuid);
+        if (wasInSpecialMode) {
+            player.getPersistentDataContainer().remove(specialModeKey);
+        }
     }
 
     public void onCommandPreprocess(PlayerCommandPreprocessEvent event) {
@@ -347,6 +363,7 @@ public class PracticeSpecManager {
         clearPracticeLocation(player);
         clearPracticeFlightState(player);
         itemUtil.removePracticeItems(player);
+        removeSpecialModeMarker(player);
         messages.send(player, message);
     }
 
@@ -438,6 +455,14 @@ public class PracticeSpecManager {
 
     private boolean fromByte(Byte value) {
         return value != null && value == (byte) 1;
+    }
+
+    private void setSpecialModeMarker(Player player) {
+        player.getPersistentDataContainer().set(specialModeKey, PersistentDataType.BYTE, (byte) 1);
+    }
+
+    private void removeSpecialModeMarker(Player player) {
+        player.getPersistentDataContainer().remove(specialModeKey);
     }
 
     private void saveSpectatorState(Player player, Location location, GameMode previousMode) {
