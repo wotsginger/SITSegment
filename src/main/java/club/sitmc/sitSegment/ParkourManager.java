@@ -21,11 +21,12 @@ import org.bukkit.scheduler.BukkitTask;
 
 public class ParkourManager {
     private final SITSegment plugin;
-    private final MessageUtil messages;
+    private MessageUtil messages;
     private final ItemUtil itemUtil;
     private final PracticeSpecManager practiceSpecManager;
     private final HologramManager hologramManager;
     private final Map<String, WorldData> worldDataMap = new HashMap<>();
+
     private final Map<String, Map<UUID, RecordEntry>> records = new HashMap<>();
     private final Map<String, Map<UUID, SavedSession>> savedSessions = new HashMap<>();
     private final Set<String> segmentWorlds = new HashSet<>();
@@ -35,13 +36,30 @@ public class ParkourManager {
     private int tickCounter;
     private static final int ACTIONBAR_PERIOD_TICKS = 5;
 
-    public ParkourManager(SITSegment plugin) {
+    /**
+     * Set to true after world-dependent config has been loaded successfully.
+     * Before this flag is set, {@link #save()} is a no-op to prevent empty
+     * in-memory data from overwriting valid config on disk.
+     */
+    private volatile boolean worldDataLoaded = false;
+
+    /**
+     * @param plugin the owning plugin
+     * @param prefix chat message prefix (default is used before real config loads)
+     */
+    public ParkourManager(SITSegment plugin, String prefix) {
         this.plugin = plugin;
-        String prefix = plugin.getConfig().getString("prefix", "&3&lSIT-Parkour &8| &f");
         this.messages = new MessageUtil(prefix);
         this.itemUtil = new ItemUtil(plugin);
         this.practiceSpecManager = new PracticeSpecManager(plugin, messages, itemUtil, this);
         this.hologramManager = new HologramManager();
+    }
+
+    /**
+     * Updates the message prefix from config after it has been safely loaded.
+     */
+    public void updatePrefix(String prefix) {
+        this.messages = new MessageUtil(prefix);
     }
 
     public void load() {
@@ -178,7 +196,15 @@ public class ParkourManager {
         }
     }
 
+    public void setWorldDataLoaded(boolean loaded) {
+        this.worldDataLoaded = loaded;
+    }
+
     public void save() {
+        if (!worldDataLoaded) {
+            plugin.getLogger().warning("save() blocked: world-dependent data has not been loaded yet. Skipping save to prevent config corruption.");
+            return;
+        }
         FileConfiguration config = plugin.getConfig();
         config.set("worlds.segment", new ArrayList<>(segmentWorlds));
         config.set("worlds.onlysprint", new ArrayList<>(onlySprintWorlds));
@@ -763,5 +789,126 @@ public class ParkourManager {
             return String.format("%d:%02d:%02d.%03d", hours, minutes, seconds, ms);
         }
         return String.format("%02d:%02d.%03d", minutes, seconds, ms);
+    }
+
+    /**
+     * 检查世界相关数据是否已加载完成。
+     */
+    public boolean isWorldDataLoaded() {
+        return worldDataLoaded;
+    }
+
+    /**
+     * 按世界名查询排行榜前 topN 名（供 Lobby 反射调用）。
+     */
+    public List<RecordEntry> getTopRecords(String worldName, int topN) {
+        if (worldName == null || topN <= 0) {
+            return List.of();
+        }
+        Map<UUID, RecordEntry> worldRecords = records.get(worldName);
+        if (worldRecords == null || worldRecords.isEmpty()) {
+            return List.of();
+        }
+        List<RecordEntry> sorted = new ArrayList<>(worldRecords.values());
+        sorted.sort(Comparator.comparingLong(RecordEntry::getTimeMs));
+        if (sorted.size() <= topN) {
+            return sorted;
+        }
+        return new ArrayList<>(sorted.subList(0, topN));
+    }
+
+    /**
+     * 查玩家在指定地图的 1-based 名次，无记录返回 -1。
+     */
+    public int getPlayerRank(String worldName, UUID playerId) {
+        if (worldName == null || playerId == null) {
+            return -1;
+        }
+        Map<UUID, RecordEntry> worldRecords = records.get(worldName);
+        if (worldRecords == null || !worldRecords.containsKey(playerId)) {
+            return -1;
+        }
+        List<RecordEntry> sorted = new ArrayList<>(worldRecords.values());
+        sorted.sort(Comparator.comparingLong(RecordEntry::getTimeMs));
+        for (int i = 0; i < sorted.size(); i++) {
+            if (sorted.get(i).getPlayerId().equals(playerId)) {
+                return i + 1;
+            }
+        }
+        return -1;
+    }
+
+    // -----------------------------------------------------------------------
+    //  供主类转发调用的构建方法（包内可见）
+    // -----------------------------------------------------------------------
+
+    /**
+     * 构建所有地图的 Map 列表，供 Lobby 钟菜单反射调用。
+     */
+    public List<Map<String, String>> buildParkourMapsList() {
+        List<Map<String, String>> result = new ArrayList<>();
+        for (String worldName : segmentWorlds) {
+            result.add(buildMapEntry(worldName, "segment"));
+        }
+        for (String worldName : onlySprintWorlds) {
+            result.add(buildMapEntry(worldName, "onlysprint"));
+        }
+        return result;
+    }
+
+    private Map<String, String> buildMapEntry(String worldName, String typeCn) {
+        Map<String, String> map = new HashMap<>();
+        map.put("id", worldName);
+        map.put("name", worldName);
+        map.put("type", typeCn);
+        map.put("world", worldName);
+        return map;
+    }
+
+    /**
+     * 构建指定地图排行榜（按榜名分组），外层 key 固定 "main"。
+     */
+    public Map<String, List<Map<String, String>>> buildLeaderboards(String worldName, int topN) {
+        List<RecordEntry> entries = getTopRecords(worldName, topN);
+        List<Map<String, String>> list = new ArrayList<>();
+        int rank = 1;
+        for (RecordEntry entry : entries) {
+            Map<String, String> item = new HashMap<>();
+            item.put("rank", String.valueOf(rank++));
+            item.put("player", entry.getName());
+            item.put("score", formatDuration(entry.getTimeMs()));
+            list.add(item);
+        }
+        Map<String, List<Map<String, String>>> result = new HashMap<>();
+        result.put("main", list);
+        return result;
+    }
+
+    /**
+     * 构建玩家个人名次（按榜名分组），外层 key 固定 "main"，无记录时 "main" 对应 null。
+     */
+    public Map<String, Map<String, String>> buildPlayerRanks(String worldName, UUID playerId) {
+        if (worldName == null || playerId == null) {
+            return null;
+        }
+        Map<UUID, RecordEntry> worldRecords = records.get(worldName);
+        if (worldRecords == null) {
+            return null;
+        }
+        RecordEntry entry = worldRecords.get(playerId);
+        if (entry == null) {
+            return null;
+        }
+        int rank = getPlayerRank(worldName, playerId);
+        if (rank < 0) {
+            return null;
+        }
+        Map<String, String> item = new HashMap<>();
+        item.put("rank", String.valueOf(rank));
+        item.put("player", entry.getName());
+        item.put("score", formatDuration(entry.getTimeMs()));
+        Map<String, Map<String, String>> result = new HashMap<>();
+        result.put("main", item);
+        return result;
     }
 }

@@ -275,17 +275,6 @@ public class ParkourCommand implements CommandExecutor, TabCompleter {
         return index;
     }
 
-    private Integer parseInteger(String input, CommandSender sender) {
-        int value;
-        try {
-            value = Integer.parseInt(input);
-        } catch (NumberFormatException ex) {
-            messages.send(sender, "&c数值必须是整数。");
-            return null;
-        }
-        return value;
-    }
-
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         String commandName = command.getName().toLowerCase();

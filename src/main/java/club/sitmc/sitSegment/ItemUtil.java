@@ -185,11 +185,11 @@ public class ItemUtil {
 
     public void giveExitItem(Player player) {
         removeLegacyExitBarrier(player);
-        ensureItemInHotbar(player.getInventory(), 7, this::isExitItem, createExitItem());
+        ensureItemInHotbar(player.getInventory(), 6, this::isExitItem, createExitItem());
     }
 
     public void giveRestartItem(Player player) {
-        ensureItemInHotbar(player.getInventory(), 8, this::isRestartItem, createRestartItem());
+        ensureItemInHotbar(player.getInventory(), 7, this::isRestartItem, createRestartItem());
     }
 
     public void givePracticeItems(Player player) {
