@@ -9,13 +9,16 @@ public class SavedSession {
     private final long elapsedMs;
     private final int lastCheckpointIndex;
     private final Location lastCheckpointLocation;
+    private final Location exitLocation;
 
-    public SavedSession(UUID playerId, String worldName, long elapsedMs, int lastCheckpointIndex, Location lastCheckpointLocation) {
+    public SavedSession(UUID playerId, String worldName, long elapsedMs, int lastCheckpointIndex,
+                        Location lastCheckpointLocation, Location exitLocation) {
         this.playerId = playerId;
         this.worldName = worldName;
         this.elapsedMs = elapsedMs;
         this.lastCheckpointIndex = lastCheckpointIndex;
         this.lastCheckpointLocation = lastCheckpointLocation == null ? null : lastCheckpointLocation.clone();
+        this.exitLocation = exitLocation == null ? null : exitLocation.clone();
     }
 
     public UUID getPlayerId() {
@@ -38,12 +41,19 @@ public class SavedSession {
         return lastCheckpointLocation == null ? null : lastCheckpointLocation.clone();
     }
 
+    public Location getExitLocation() {
+        return exitLocation == null ? null : exitLocation.clone();
+    }
+
     public void bindWorld(org.bukkit.World world) {
-        if (world == null || lastCheckpointLocation == null) {
+        if (world == null) {
             return;
         }
-        if (lastCheckpointLocation.getWorld() == null) {
+        if (lastCheckpointLocation != null && lastCheckpointLocation.getWorld() == null) {
             lastCheckpointLocation.setWorld(world);
+        }
+        if (exitLocation != null && exitLocation.getWorld() == null) {
+            exitLocation.setWorld(world);
         }
     }
 }

@@ -32,6 +32,7 @@ public class ParkourManager {
     private final Set<String> segmentWorlds = new HashSet<>();
     private final Set<String> onlySprintWorlds = new HashSet<>();
     private final Map<UUID, RunSession> sessions = new HashMap<>();
+    private final Set<UUID> internalTeleports = new HashSet<>();
     private BukkitTask tickTask;
     private int tickCounter;
     private static final int ACTIONBAR_PERIOD_TICKS = 5;
@@ -160,7 +161,8 @@ public class ParkourManager {
                     if (lastLocation == null) {
                         continue;
                     }
-                    worldSessions.put(uuid, new SavedSession(uuid, worldName, elapsed, lastIndex, lastLocation));
+                    Location exitLocation = readLocation(config, "sessions." + worldName + "." + key + ".exitLocation");
+                    worldSessions.put(uuid, new SavedSession(uuid, worldName, elapsed, lastIndex, lastLocation, exitLocation));
                 }
                 if (!worldSessions.isEmpty()) {
                     savedSessions.put(worldName, worldSessions);
@@ -246,6 +248,9 @@ public class ParkourManager {
                 config.set(sessionPath + ".elapsed", savedSession.getElapsedMs());
                 config.set(sessionPath + ".lastIndex", savedSession.getLastCheckpointIndex());
                 config.set(sessionPath + ".lastLocation", savedSession.getLastCheckpointLocation());
+                if (savedSession.getExitLocation() != null) {
+                    config.set(sessionPath + ".exitLocation", savedSession.getExitLocation());
+                }
             }
         }
         for (Map.Entry<String, Map<String, UUID>> entry : hologramManager.getStoredHolograms().entrySet()) {
@@ -356,6 +361,14 @@ public class ParkourManager {
         return sessions.get(playerId);
     }
 
+    public void markInternalTeleport(UUID playerId) {
+        internalTeleports.add(playerId);
+    }
+
+    public boolean consumeInternalTeleport(UUID playerId) {
+        return internalTeleports.remove(playerId);
+    }
+
     public List<RecordEntry> getTopRecords(World world, int limit) {
         if (world == null || limit <= 0) {
             return List.of();
@@ -435,10 +448,31 @@ public class ParkourManager {
         }
         RunSession session = new RunSession(playerId);
         long startTimeMs = System.currentTimeMillis() - savedSession.getElapsedMs();
-        session.restore(world.getName(), startTimeMs, savedSession.getLastCheckpointIndex(), lastLocation, data);
+        session.restore(world.getName(), startTimeMs, savedSession.getLastCheckpointIndex(), lastLocation,
+                savedSession.getExitLocation(), data);
         sessions.put(playerId, session);
         messages.send(player, "&a已恢复你的跑酷进度。");
         giveDefaultItems(player);
+
+        // Teleport to exit location if available
+        Location exitLocation = savedSession.getExitLocation();
+        if (exitLocation != null) {
+            World exitWorld = exitLocation.getWorld();
+            if (exitWorld == null) {
+                exitLocation.setWorld(world);
+                exitWorld = world;
+            }
+            if (exitWorld.equals(player.getWorld())) {
+                markInternalTeleport(playerId);
+                player.teleport(exitLocation);
+            } else {
+                plugin.getLogger().warning("无法将玩家 " + player.getName()
+                        + " 传送至离开坐标：目标世界 " + exitWorld.getName() + " 与当前世界不匹配。"
+                        + " 已退回世界出生点。");
+                markInternalTeleport(playerId);
+                player.teleport(player.getWorld().getSpawnLocation());
+            }
+        }
     }
 
     public void restoreOnlinePlayers() {
@@ -514,6 +548,7 @@ public class ParkourManager {
         sessions.remove(player.getUniqueId());
         clearSavedSession(player.getUniqueId(), world.getName());
         Location start = data.getStart();
+        markInternalTeleport(player.getUniqueId());
         player.teleport(start.clone());
         RunSession session = new RunSession(player.getUniqueId());
         session.start(world.getName(), start, data);
@@ -529,6 +564,7 @@ public class ParkourManager {
         sessions.remove(player.getUniqueId());
         clearSavedSession(player.getUniqueId(), world.getName());
         messages.clearActionBar(player);
+        markInternalTeleport(player.getUniqueId());
         player.teleport(world.getSpawnLocation());
         messages.send(player, "&a已退出当前跑酷。");
         giveDefaultItems(player);
@@ -630,6 +666,8 @@ public class ParkourManager {
                 iterator.remove();
                 continue;
             }
+            // Track the player's current location for later save (exit location)
+            session.setExitLocation(player.getLocation().clone());
             WorldMode mode = getWorldMode(player.getWorld());
             if (mode == WorldMode.NONE) {
                 messages.clearActionBar(player);
@@ -673,6 +711,7 @@ public class ParkourManager {
             messages.send(player, "&c未找到可返回的记录点。");
             return;
         }
+        markInternalTeleport(player.getUniqueId());
         player.teleport(target.clone());
         messages.send(player, message);
     }
@@ -689,9 +728,18 @@ public class ParkourManager {
         if (lastLocation == null) {
             return;
         }
+        // Get exit location: prefer the player's current real-time location; fall back to session's tracked location
+        Location exitLocation = null;
+        Player player = Bukkit.getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            exitLocation = player.getLocation().clone();
+        } else {
+            exitLocation = session.getExitLocation();
+        }
         long elapsed = System.currentTimeMillis() - session.getStartTimeMs();
         Map<UUID, SavedSession> worldSessions = savedSessions.computeIfAbsent(worldName, key -> new HashMap<>());
-        worldSessions.put(playerId, new SavedSession(playerId, worldName, elapsed, session.getLastCheckpointIndex(), lastLocation));
+        worldSessions.put(playerId, new SavedSession(playerId, worldName, elapsed, session.getLastCheckpointIndex(),
+                lastLocation, exitLocation));
         save();
     }
 
@@ -910,5 +958,86 @@ public class ParkourManager {
         Map<String, Map<String, String>> result = new HashMap<>();
         result.put("main", item);
         return result;
+    }
+
+    // -----------------------------------------------------------------------
+    //  记录管理：删除
+    // -----------------------------------------------------------------------
+
+    /**
+     * 按 UUID 删除指定地图中的玩家记录。
+     *
+     * @param worldName 地图标识（世界名）
+     * @param playerId  玩家 UUID
+     * @return 被删除的 RecordEntry，若不存在返回 null
+     */
+    public RecordEntry deleteRecord(String worldName, UUID playerId) {
+        if (worldName == null || playerId == null) {
+            return null;
+        }
+        Map<UUID, RecordEntry> worldRecords = records.get(worldName);
+        if (worldRecords == null) {
+            return null;
+        }
+        RecordEntry removed = worldRecords.remove(playerId);
+        if (removed != null) {
+            if (worldRecords.isEmpty()) {
+                records.remove(worldName);
+            }
+            save();
+        }
+        return removed;
+    }
+
+    /**
+     * 按玩家名在指定地图的记录中查找（大小写不敏感）。
+     *
+     * @param worldName 地图标识（世界名）
+     * @param playerName 玩家名
+     * @return Map.Entry&lt;UUID, RecordEntry&gt;，未找到返回 null
+     */
+    public Map.Entry<UUID, RecordEntry> findRecordByName(String worldName, String playerName) {
+        if (worldName == null || playerName == null) {
+            return null;
+        }
+        Map<UUID, RecordEntry> worldRecords = records.get(worldName);
+        if (worldRecords == null) {
+            return null;
+        }
+        for (Map.Entry<UUID, RecordEntry> entry : worldRecords.entrySet()) {
+            if (entry.getValue().getName().equalsIgnoreCase(playerName)) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 获取指定地图中有记录的所有玩家名（供 tab 补全）。
+     */
+    public List<String> getRecordPlayerNames(String worldName) {
+        if (worldName == null) {
+            return List.of();
+        }
+        Map<UUID, RecordEntry> worldRecords = records.get(worldName);
+        if (worldRecords == null) {
+            return List.of();
+        }
+        List<String> names = new ArrayList<>();
+        for (RecordEntry entry : worldRecords.values()) {
+            names.add(entry.getName());
+        }
+        return names;
+    }
+
+    /**
+     * 获取所有跑酷地图的世界名（segment + onlysprint + 有记录的世界）。
+     */
+    public Set<String> getAllParkourWorldNames() {
+        Set<String> all = new HashSet<>();
+        all.addAll(segmentWorlds);
+        all.addAll(onlySprintWorlds);
+        all.addAll(records.keySet());
+        return all;
     }
 }

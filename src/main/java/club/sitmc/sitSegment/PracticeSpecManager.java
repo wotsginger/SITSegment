@@ -216,6 +216,7 @@ public class PracticeSpecManager {
         }
 
         if (state.location != null) {
+            parkourManager.markInternalTeleport(player.getUniqueId());
             player.teleport(state.location.clone());
         }
         if (state.previousGameMode != null) {
@@ -312,6 +313,7 @@ public class PracticeSpecManager {
         }
 
         if (itemUtil.isPracticeReturnItem(item)) {
+            parkourManager.markInternalTeleport(player.getUniqueId());
             player.teleport(saved.clone());
             messages.send(player, "&a已返回练习点。");
             return true;
@@ -357,6 +359,7 @@ public class PracticeSpecManager {
 
     private void exitPractice(Player player, Location saved, boolean teleport, String message) {
         if (teleport && saved != null) {
+            parkourManager.markInternalTeleport(player.getUniqueId());
             player.teleport(saved.clone());
         }
         restoreOriginalFlightState(player);
@@ -364,6 +367,12 @@ public class PracticeSpecManager {
         clearPracticeFlightState(player);
         itemUtil.removePracticeItems(player);
         removeSpecialModeMarker(player);
+        // Clear potion effects accumulated during practice
+        for (org.bukkit.potion.PotionEffect effect : player.getActivePotionEffects()) {
+            player.removePotionEffect(effect.getType());
+        }
+        // Clear boots
+        player.getInventory().setBoots(null);
         messages.send(player, message);
     }
 
