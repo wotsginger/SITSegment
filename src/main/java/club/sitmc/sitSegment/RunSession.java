@@ -11,6 +11,7 @@ public class RunSession {
     private int lastCheckpointIndex;
     private Location lastCheckpointLocation;
     private Integer nextCheckpointIndex;
+    private Location exitLocation;
 
     public RunSession(UUID playerId) {
         this.playerId = playerId;
@@ -51,6 +52,7 @@ public class RunSession {
         this.lastCheckpointIndex = 0;
         this.lastCheckpointLocation = startLocation == null ? null : startLocation.clone();
         this.nextCheckpointIndex = data == null ? null : data.getNextCheckpointIndex(0);
+        this.exitLocation = startLocation == null ? null : startLocation.clone();
     }
 
     public void reachCheckpoint(int index, Location checkpointLocation, WorldData data) {
@@ -59,12 +61,22 @@ public class RunSession {
         this.nextCheckpointIndex = data == null ? null : data.getNextCheckpointIndex(index);
     }
 
-    public void restore(String worldName, long startTimeMs, int lastCheckpointIndex, Location lastCheckpointLocation, WorldData data) {
+    public void restore(String worldName, long startTimeMs, int lastCheckpointIndex, Location lastCheckpointLocation,
+                        Location exitLocation, WorldData data) {
         this.worldName = worldName;
         this.started = true;
         this.startTimeMs = startTimeMs;
         this.lastCheckpointIndex = lastCheckpointIndex;
         this.lastCheckpointLocation = lastCheckpointLocation == null ? null : lastCheckpointLocation.clone();
+        this.exitLocation = exitLocation == null ? null : exitLocation.clone();
         this.nextCheckpointIndex = data == null ? null : data.getNextCheckpointIndex(lastCheckpointIndex);
+    }
+
+    public Location getExitLocation() {
+        return exitLocation == null ? null : exitLocation.clone();
+    }
+
+    public void setExitLocation(Location exitLocation) {
+        this.exitLocation = exitLocation == null ? null : exitLocation.clone();
     }
 }

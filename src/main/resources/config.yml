@@ -2,11 +2,9 @@ prefix: "&3&lSIT-Parkour &8| &f"
 worlds:
   segment: []
   onlysprint: []
-  pkw: []
 points: {}
 holograms: {}
 records: {}
 sessions: {}
-pkw: {}
 disabled-worlds: []
 spec-disabled-worlds: []

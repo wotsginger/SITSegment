@@ -4,6 +4,7 @@ main: club.sitmc.sitSegment.SITSegment
 api-version: '1.21'
 prefix: SITMCPK
 load: POSTWORLD
+softdepend: [SITParkourLobby]
 authors: [ 上应大Minecraft社 ]
 description: SIT Parkour Segment
 website: www.sitmc.club

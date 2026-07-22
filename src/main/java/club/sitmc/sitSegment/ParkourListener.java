@@ -1,5 +1,6 @@
 package club.sitmc.sitSegment;
 
+import java.util.UUID;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -14,6 +15,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -35,10 +37,6 @@ public class ParkourListener implements Listener {
         World world = to.getWorld();
         WorldMode mode = manager.getWorldMode(world);
         if (mode == WorldMode.NONE) {
-            return;
-        }
-        if (mode == WorldMode.PKW) {
-            manager.handlePkwMove(event.getPlayer(), from, to);
             return;
         }
         if (isSameBlock(from, to)) {
@@ -95,16 +93,31 @@ public class ParkourListener implements Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         manager.saveAndRemoveSession(event.getPlayer());
-        manager.clearPkwSession(event.getPlayer());
         manager.getPracticeSpecManager().onQuit(event.getPlayer());
     }
 
     @EventHandler
     public void onWorldChange(PlayerChangedWorldEvent event) {
         manager.saveAndRemoveSession(event.getPlayer());
-        manager.clearPkwSession(event.getPlayer());
         manager.tryRestoreSession(event.getPlayer());
         manager.giveDefaultItems(event.getPlayer());
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerTeleport(PlayerTeleportEvent event) {
+        Player player = event.getPlayer();
+        UUID playerId = player.getUniqueId();
+        // Skip if this teleport was triggered by the plugin itself (return item, restart, exit, etc.)
+        if (manager.consumeInternalTeleport(playerId)) {
+            return;
+        }
+        // Only save if player has an active parkour session
+        RunSession session = manager.getSession(playerId);
+        if (session == null || !session.isStarted()) {
+            return;
+        }
+        // Player is being teleported away by an external source — save progress with current location
+        manager.saveAndRemoveSession(player);
     }
 
     @EventHandler
@@ -139,17 +152,6 @@ public class ParkourListener implements Listener {
 
         if (manager.getPracticeSpecManager().handlePracticeItemInteract(player, item)) {
             event.setCancelled(true);
-            return;
-        }
-
-        if (manager.getItemUtil().isPkwGateReturnItem(item)) {
-            event.setCancelled(true);
-            manager.handlePkwReturn(player);
-            return;
-        }
-        if (manager.getItemUtil().isPkwAbandonItem(item)) {
-            event.setCancelled(true);
-            manager.handlePkwAbandon(player);
             return;
         }
 
